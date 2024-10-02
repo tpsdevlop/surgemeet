@@ -3,4 +3,4 @@ from django.shortcuts import render
 
 # Create your views here.
 def home (request):
-    return HttpResponse('Welcome to the good home page push push 021024v2')
+    return HttpResponse('Welcome to the good home page push push 021024v4')

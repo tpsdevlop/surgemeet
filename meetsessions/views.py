@@ -254,3 +254,29 @@ def get_session_by_id(request, session_id):
         return JsonResponse(session_data, safe=False)
     except Session.DoesNotExist:
         return JsonResponse({'error': 'Session does not exist'}, status=404)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def update_video_link(request):
+    try:
+        data = json.loads(request.body)
+        session_id = data.get('session_id')
+        video_link = data.get('videoLink')
+        
+        if not session_id or not video_link:
+            return JsonResponse({'error': 'Both session_id and videoLink are required'}, status=400)
+        
+        # Fetch the session by ID
+        session = Session.objects.get(id=session_id)
+        
+        # Update the videoLink field
+        session.videoLink = video_link
+        session.save()
+
+        return JsonResponse({'message': 'Video link updated successfully'}, status=200)
+    
+    except Session.DoesNotExist:
+        return JsonResponse({'error': 'Session not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
