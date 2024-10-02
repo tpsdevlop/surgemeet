@@ -14,13 +14,12 @@ from .models import Session, Student  # Adjust the import path according to your
 @require_http_methods(["POST"])
 def create_session2(request):
     data = json.loads(request.body)
-    
     try:
-        # Get the max id from the existing sessions and increment it by 1
+        # Get the current maximum id and calculate the new id
         max_id = Session.objects.aggregate(Max('id'))['id__max']
         new_id = (max_id or 0) + 1
         
-        # Create the session
+        # Create a new session object with all fields explicitly included
         session = Session.objects.create(
             id=new_id,
             Session_Topic=data['Session_Topic'],
@@ -29,13 +28,64 @@ def create_session2(request):
             conductedby=data['conductedby'],
             meetlink=data['meetlink'],
             Colleges=data['Colleges'],
-            Branches=data['Branches']
+            Branches=data['Branches'],
+            ended=False, 
+            videoLink="",  
+            studentsinvited = []
         )
-        
         return JsonResponse({'message': 'Session created successfully', 'session_id': session.id}, status=201)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
     
+# @csrf_exempt
+# @require_http_methods(["POST"])
+# def add_students_to_session(request):
+#     data = json.loads(request.body)
+#     try:
+#         session_id = data['session_id']
+#         session = Session.objects.get(id=session_id)
+#         recipient_emails = []
+#         for student_data in data['Students']:
+#             try:
+#                 Student.objects.create(
+#                     session=session,
+#                     stuId=student_data['stuId'],
+#                     stuname=student_data['stuname'],
+#                     gender=student_data['gender'],
+#                     phonenumber=student_data['phonenumber'],
+#                     branch=student_data['branch'],
+#                     collegeName=student_data['collegeName'],
+#                     email=student_data['email']
+#                 )
+#                 recipient_emails.append(student_data['email'])
+#             except Exception as e:
+#                 print(f"Error creating student: {e}")
+        
+#         # Prepare email details
+#         subject = f"Details for the {session.Session_Topic} session"
+#         message = f"""
+#         Hello,
+
+#         You have been registered for the session: {session.Session_Topic}.
+#         Details are as follows:
+#         Date: {session.Date}
+#         Time: {session.Start_Time}
+#         Conducted by: {session.conductedby}
+#         Meet Link: {session.meetlink}
+
+#         Regards,
+#         Your Team
+#         """
+#         from_email = settings.EMAIL_HOST_USER
+
+#         send_session_email(subject, message, from_email, recipient_emails)
+        
+#         return JsonResponse({'message': 'Students added and emails sent successfully'}, status=201)
+#     except Session.DoesNotExist:
+#         return JsonResponse({'error': 'Session not found'}, status=404)
+#     except Exception as e:
+#         return JsonResponse({'error': str(e)}, status=400)
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def add_students_to_session(request):
@@ -43,24 +93,22 @@ def add_students_to_session(request):
     try:
         session_id = data['session_id']
         session = Session.objects.get(id=session_id)
+        
         recipient_emails = []
+        new_students = []
+        
         for student_data in data['Students']:
             try:
-                Student.objects.create(
-                    session=session,
-                    stuId=student_data['stuId'],
-                    stuname=student_data['stuname'],
-                    gender=student_data['gender'],
-                    phonenumber=student_data['phonenumber'],
-                    branch=student_data['branch'],
-                    collegeName=student_data['collegeName'],
-                    email=student_data['email']
-                )
+                # Only collect the student ID and email, without creating new Student objects
+                new_students.append(student_data['stuId'])  # Collect student IDs to update `studentsinvited`
                 recipient_emails.append(student_data['email'])
             except Exception as e:
-                print(f"Error creating student: {e}")
+                print(f"Error processing student data: {e}")
         
-        # Prepare email details
+        # Update the session's studentsinvited field by appending new IDs
+        session.studentsinvited.extend(new_students)  # Append new student IDs to the existing list
+        session.save()  # Save the session with the updated studentsinvited list
+        # Prepare and send the email to the students
         subject = f"Details for the {session.Session_Topic} session"
         message = f"""
         Hello,
@@ -76,16 +124,14 @@ def add_students_to_session(request):
         Your Team
         """
         from_email = settings.EMAIL_HOST_USER
-
         send_session_email(subject, message, from_email, recipient_emails)
-        
         return JsonResponse({'message': 'Students added and emails sent successfully'}, status=201)
+    
     except Session.DoesNotExist:
         return JsonResponse({'error': 'Session not found'}, status=404)
+    
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
-
-
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -175,7 +221,9 @@ def get_all_sessions(request):
             'Start_Time': session.Start_Time,
             'conductedby': session.conductedby,
             'meetlink': session.meetlink,
-            'hasEnded':session.ended
+            'hasEnded': session.ended,
+            'videoLink': session.videoLink,  # Added videoLink
+            'studentsinvited': session.studentsinvited  # Added studentsinvited
         })
     return JsonResponse(session_data, safe=False)
 
