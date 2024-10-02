@@ -137,6 +137,7 @@ def get_meeting_details(request, meeting_code,email):
         client = meet_v2.SpacesServiceClient(credentials=creds)
         request = meet_v2.GetSpaceRequest(name=f'spaces/{meeting_code}')
         response = client.get_space(request=request)
+        print(response)
         meeting_details = {
             'name': response.name,
             'meeting_code': meeting_code,
