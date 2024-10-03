@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import UserDetails,UserLogin
+from django.utils import timezone
 # Register your models here.
 @admin.register(UserDetails)
 class UserDetailsAdmin(admin.ModelAdmin):

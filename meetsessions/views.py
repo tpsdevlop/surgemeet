@@ -109,7 +109,7 @@ def add_students_to_session(request):
         session.studentsinvited.extend(new_students)  # Append new student IDs to the existing list
         session.save()  # Save the session with the updated studentsinvited list
         # Prepare and send the email to the students
-        subject = f"Details for the {session.Session_Topic} session"
+        subject = f"Invitation to Join: {session.Session_Topic} Session"
         message = f"""
         Hello,
 
@@ -121,7 +121,7 @@ def add_students_to_session(request):
         Meet Link: {session.meetlink}
 
         Regards,
-        Your Team
+        Exskilence Upskilling Program
         """
         from_email = settings.EMAIL_HOST_USER
         send_session_email(subject, message, from_email, recipient_emails)

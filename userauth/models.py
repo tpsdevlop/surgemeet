@@ -37,3 +37,6 @@ class UserActivity(models.Model):
 
     def __str__(self):
         return f'{self.user.email} last active at {self.last_activity}'
+    
+
+

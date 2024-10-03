@@ -61,13 +61,12 @@ class LoginWithGoogle(APIView):
         return Response(status=status.HTTP_400_BAD_REQUEST)
     
 class ClearUserLoginData(APIView):
-
     def post(self, request):
         if 'email' in request.data.keys():
             user_email = request.data['email']
             print("logout was triggered")
             try:
-                user_login = UserLogin.objects.get(email=user_email)
+                user_login = UserLogin.objects.filter(email=user_email)
                 user_login.delete()
                 return Response({"message": "User login data cleared successfully", "status": "success"})
             except UserLogin.DoesNotExist:
