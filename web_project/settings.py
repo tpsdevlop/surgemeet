@@ -182,8 +182,8 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False
-EMAIL_HOST_USER = 'exskilenceupskilling@gmail.com'  # Replace with your Gmail address
-EMAIL_HOST_PASSWORD = 'myco gfhi uhqf bjaj'  # Replace with your Gmail app password
+EMAIL_HOST_USER = 'kecoview@gmail.com'  # Replace with your Gmail address
+EMAIL_HOST_PASSWORD = 'etbk kimg ghtn yjgj'  # Replace with your Gmail app password
 
 # Use certifi's CA file
 EMAIL_TLS_CA_FILE = certifi.where()
