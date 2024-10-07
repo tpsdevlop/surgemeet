@@ -93,6 +93,7 @@ def add_students_to_session(request):
     try:
         session_id = data['session_id']
         session = Session.objects.get(id=session_id)
+        sessiontopic = session.Session_Topic
         
         recipient_emails = []
         new_students = []
@@ -125,8 +126,9 @@ def add_students_to_session(request):
         """
         from_email = settings.EMAIL_HOST_USER
         send_session_email(subject, message, from_email, recipient_emails)
-        return JsonResponse({'message': 'Students added and emails sent successfully'}, status=201)
-    
+        student_count = len(new_students)
+        success_message = f"{student_count} students have been successfully added to the session: {sessiontopic}"
+        return JsonResponse({'message': success_message}, status=201)    
     except Session.DoesNotExist:
         return JsonResponse({'error': 'Session not found'}, status=404)
     
