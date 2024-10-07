@@ -229,16 +229,17 @@ def get_all_sessions(request):
         })
     return JsonResponse(session_data, safe=False)
 
-
 @csrf_exempt
 @require_http_methods(["GET"])
 def get_session_by_id(request, session_id):
     try:
+        # Fetch the session by ID
         session = Session.objects.get(id=session_id)
         
         # Assuming 'Student' is a related model and you want to exclude the 'id' field
         student_fields = [field.name for field in session.students.model._meta.fields if field.name != 'id']
-        
+
+        # Create the session data to return as JSON
         session_data = {
             'id': session.id,
             'Session_Topic': session.Session_Topic,
@@ -248,15 +249,14 @@ def get_session_by_id(request, session_id):
             'meetlink': session.meetlink,
             'Colleges': session.Colleges,
             'Branches': session.Branches,
-            'hasEnded':session.ended,
-            
-            # Fetch students and exclude 'id' by specifying other fields explicitly
-            'Students': list(session.students.values(*student_fields))
+            'hasEnded': session.ended,
+            'videoLink': session.videoLink,
+            'Students': list(session.students.values(*student_fields)),  # Fetching related students
+            'StudentsInvited': session.studentsinvited,  # Extracting the list of invited students
         }
         return JsonResponse(session_data, safe=False)
     except Session.DoesNotExist:
         return JsonResponse({'error': 'Session does not exist'}, status=404)
-
 
 @csrf_exempt
 @require_http_methods(["POST"])
