@@ -1,7 +1,10 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
-from .models import Log, Session,Participant
+from .models import Log, Session, Participant
+from datetime import datetime
+import pytz
+
 @csrf_exempt
 def get_session_and_participant_info(request):
     if request.method == 'POST':
@@ -31,17 +34,22 @@ def get_session_and_participant_info(request):
             }
 
             participant_info = []
+
             for participant in participants:
-                # Get participant logs
                 logs = Log.objects.filter(session_id=session.session_id, student_id=participant.student_id)
 
-                # Collect log details
-                session_logs = [{
-                    'session_start_time': log.session_start_time,
-                    'session_end_time': log.session_end_time
-                } for log in logs]
+                session_logs = []
+                for log in logs:
+                    # Print original UTC times
+                    # print(f"Original UTC Start Time: {log.session_start_time}")
+                    # print(f"Original UTC End Time: {log.session_end_time}")
 
-                # Append participant info
+                    # Append the log info
+                    session_logs.append({
+                        'session_start_time': log.session_start_time.strftime('%Y-%m-%d %H:%M:%S'),
+                        'session_end_time': log.session_end_time.strftime('%Y-%m-%d %H:%M:%S')
+                    })
+
                 participant_info.append({
                     'student_id': participant.student_id,
                     'display_name': participant.display_name,
