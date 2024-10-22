@@ -122,15 +122,28 @@ WSGI_APPLICATION = 'web_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'djongo',
+#         'NAME': 'dontdeletewithoutbackup2',
+#         'ENFORCE_SCHEMA': False,  
+#         'CLIENT': {
+#             'host': 'mongodb+srv://deepakramanujam321:o8rPuwKDidIAWWDf@cluster0.fwvqbjh.mongodb.net/',
+#             'username': 'deepakramanujam321',
+#             'password': 'o8rPuwKDidIAWWDf',
+#             'authMechanism': 'SCRAM-SHA-1',
+#         }
+#     }
+# }
 DATABASES = {
     'default': {
         'ENGINE': 'djongo',
-        'NAME': 'dontdeletewithoutbackup2',
+        'NAME': 'dontdeletewithoutbackup1',
         'ENFORCE_SCHEMA': False,  
         'CLIENT': {
-            'host': 'mongodb+srv://deepakramanujam321:o8rPuwKDidIAWWDf@cluster0.fwvqbjh.mongodb.net/',
-            'username': 'deepakramanujam321',
-            'password': 'o8rPuwKDidIAWWDf',
+            'host': 'mongodb+srv://kecoview:FVy5fqqCtQy3KIt6@cluster0.b9wmlid.mongodb.net/',
+            'username': 'kecoview',
+            'password': 'FVy5fqqCtQy3KIt6',
             'authMechanism': 'SCRAM-SHA-1',
         }
     }

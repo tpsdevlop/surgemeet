@@ -282,3 +282,14 @@ def update_video_link(request):
         return JsonResponse({'error': 'Session not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+    
+@csrf_exempt
+@require_http_methods(["GET"])
+def end_session(request, session_id):
+    try:
+        session = Session.objects.get(id=session_id)
+        session.ended = True
+        session.save() 
+        return JsonResponse({"message": "Session ended successfully."}, status=200)
+    except Session.DoesNotExist:
+        return JsonResponse({"error": "Session not found."}, status=404)
