@@ -46,9 +46,9 @@ INSTALLED_APPS = [
     'trainer',
     'colleges',
     'branches',
-    'playground',
     'userauth',
-    'meetsessions'
+    'meetsessions',
+    'googleMeet'
 ]
 
 MIDDLEWARE = [
@@ -86,11 +86,11 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:5500', 
     'http://127.0.0.1:5501',
     'http://localhost:5173', 
-    # 'https://surgemeetlink.azurewebsites.net/',
+    'https://surgemeetlink.azurewebsites.net/',
 ]
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
-    # 'https://surgemeet.azurewebsites.net/',
+    'https://surgemeet.azurewebsites.net/',
 ]
 
 
@@ -125,7 +125,7 @@ WSGI_APPLICATION = 'web_project.wsgi.application'
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'djongo',
-#         'NAME': 'dontdeletewithoutbackup2',
+#         'NAME': 'dontdeletewithoutbackup5',
 #         'ENFORCE_SCHEMA': False,  
 #         'CLIENT': {
 #             'host': 'mongodb+srv://deepakramanujam321:o8rPuwKDidIAWWDf@cluster0.fwvqbjh.mongodb.net/',
@@ -135,19 +135,41 @@ WSGI_APPLICATION = 'web_project.wsgi.application'
 #         }
 #     }
 # }
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'djongo',
+#         'NAME': 'dontdeletewithoutbackup1',
+#         'ENFORCE_SCHEMA': False,  
+#         'CLIENT': {
+#             'host': 'mongodb+srv://kecoview:FVy5fqqCtQy3KIt6@cluster0.b9wmlid.mongodb.net/',
+#             'username': 'kecoview',
+#             'password': 'FVy5fqqCtQy3KIt6',
+#             'authMechanism': 'SCRAM-SHA-1',
+#         }
+#     }
+# }
+# ++++++++++++++++++++++++++++++++++++++++++++
+# Live database
+from urllib.parse import quote_plus
+uname = 'EUAdmin'
+pwd = 'EUServer@sa123'
+escaped_username = quote_plus(uname)
+escaped_password = quote_plus(pwd)
+uri = f"mongodb+srv://{escaped_username}:{escaped_password}@eucluster.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
 DATABASES = {
     'default': {
         'ENGINE': 'djongo',
-        'NAME': 'dontdeletewithoutbackup1',
+        'NAME': 'ExskilenceDb',
         'ENFORCE_SCHEMA': False,  
         'CLIENT': {
-            'host': 'mongodb+srv://kecoview:FVy5fqqCtQy3KIt6@cluster0.b9wmlid.mongodb.net/',
-            'username': 'kecoview',
-            'password': 'FVy5fqqCtQy3KIt6',
-            'authMechanism': 'SCRAM-SHA-1',
+            'host': uri,
+            'username': uname,
+            'password': pwd,
+            'authMechanism': 'SCRAM-SHA-256',
         }
     }
 }
+# ++++++++++++++++++++++++++++++++++++++++++++++
 
 
 # Password validation

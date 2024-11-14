@@ -8,7 +8,7 @@ import json
 import smtplib
 import ssl
 import certifi
-from .models import Session, Student  # Adjust the import path according to your project structure
+from .models import Session 
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -26,6 +26,7 @@ def create_session2(request):
             Date=data['Date'],
             Start_Time=data['Start_Time'],
             conductedby=data['conductedby'],
+            subject=data['subject'],
             meetlink=data['meetlink'],
             Colleges=data['Colleges'],
             Branches=data['Branches'],
@@ -94,7 +95,6 @@ def add_students_to_session(request):
         session_id = data['session_id']
         session = Session.objects.get(id=session_id)
         sessiontopic = session.Session_Topic
-        
         recipient_emails = []
         new_students = []
         
@@ -109,67 +109,8 @@ def add_students_to_session(request):
         # Update the session's studentsinvited field by appending new IDs
         session.studentsinvited.extend(new_students)  # Append new student IDs to the existing list
         session.save()  # Save the session with the updated studentsinvited list
-        # Prepare and send the email to the students
-        subject = f"Invitation to Join: {session.Session_Topic} Session"
-        message = f"""
-        Hello,
-
-        You have been registered for the session: {session.Session_Topic}.
-        Details are as follows:
-        Date: {session.Date}
-        Time: {session.Start_Time}
-        Conducted by: {session.conductedby}
-        Meet Link: {session.meetlink}
-
-        Regards,
-        Exskilence Upskilling Program
-        """
-        from_email = settings.EMAIL_HOST_USER
-        send_session_email(subject, message, from_email, recipient_emails)
-        student_count = len(new_students)
-        success_message = f"{student_count} students have been successfully added to the session: {sessiontopic}"
-        return JsonResponse({'message': success_message}, status=201)    
-    except Session.DoesNotExist:
-        return JsonResponse({'error': 'Session not found'}, status=404)
-    
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def create_session(request):
-    data = json.loads(request.body)
-    
-    try:
-        max_id = Session.objects.aggregate(Max('id'))['id__max']
-        new_id = (max_id or 0) + 1
         
-        session = Session.objects.create(
-            id=new_id,
-            Session_Topic=data['Session_Topic'],
-            Date=data['Date'],
-            Start_Time=data['Start_Time'],
-            conductedby=data['conductedby'],
-            meetlink=data['meetlink'],
-            Colleges=data['Colleges'],
-            Branches=data['Branches']
-        )
-        recipient_emails = []
-        for student_data in data['Students']:
-            try:
-                Student.objects.create(
-                    session=session,
-                    stuId=student_data['stuId'],
-                    stuname=student_data['stuname'],
-                    gender=student_data['gender'],
-                    phonenumber=student_data['phonenumber'],
-                    branch=student_data['branch'],
-                    collegeName=student_data['collegeName'],
-                    email=student_data['email']
-                )
-                recipient_emails.append(student_data['email'])
-            except Exception as e:
-                print(f"Error creating student: {e}")
+        # Prepare and send the email to the students
         subject = f"Details for the {session.Session_Topic} session"
         message = f"""
         Hello,
@@ -185,12 +126,22 @@ def create_session(request):
         Your Team
         """
         from_email = settings.EMAIL_HOST_USER
-
         send_session_email(subject, message, from_email, recipient_emails)
         
-        return JsonResponse({'message': 'Session created and emails sent successfully'}, status=201)
+        # Return success message with the count of students added and the session topic
+        student_count = len(new_students)
+        success_message = f"{student_count} students have been successfully added to the session: {sessiontopic}"
+        return JsonResponse({'message': success_message}, status=201)
+    
+    except Session.DoesNotExist:
+        return JsonResponse({'error': 'Session not found'}, status=404)
+    
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+
+
+
+
 def send_session_email(subject, message, from_email, recipient_list):
     
     context = ssl.create_default_context(cafile=certifi.where())
@@ -222,6 +173,7 @@ def get_all_sessions(request):
             'Date': session.Date.strftime('%Y-%m-%d'),
             'Start_Time': session.Start_Time,
             'conductedby': session.conductedby,
+            'subject': session.subject,
             'meetlink': session.meetlink,
             'hasEnded': session.ended,
             'videoLink': session.videoLink,  # Added videoLink
@@ -229,17 +181,13 @@ def get_all_sessions(request):
         })
     return JsonResponse(session_data, safe=False)
 
+
 @csrf_exempt
 @require_http_methods(["GET"])
 def get_session_by_id(request, session_id):
     try:
-        # Fetch the session by ID
         session = Session.objects.get(id=session_id)
-        
-        # Assuming 'Student' is a related model and you want to exclude the 'id' field
         student_fields = [field.name for field in session.students.model._meta.fields if field.name != 'id']
-
-        # Create the session data to return as JSON
         session_data = {
             'id': session.id,
             'Session_Topic': session.Session_Topic,
@@ -257,6 +205,8 @@ def get_session_by_id(request, session_id):
         return JsonResponse(session_data, safe=False)
     except Session.DoesNotExist:
         return JsonResponse({'error': 'Session does not exist'}, status=404)
+
+
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -292,4 +242,43 @@ def end_session(request, session_id):
         session.save() 
         return JsonResponse({"message": "Session ended successfully."}, status=200)
     except Session.DoesNotExist:
-        return JsonResponse({"error": "Session not found."}, status=404)
+        return JsonResponse("error: Session not found.", status=404)
+    
+
+
+
+from googleMeet.models import Participant
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_all_sessions_with_attendances(request):
+    try:
+        sessions = Session.objects.all()
+        session_data = []
+        
+        for session in sessions:
+            # Get participant count directly from Participant model
+            attended_count = Participant.objects.filter(session_id=session.id).count()
+            
+            session_data.append({
+                'id': session.id,
+                'Session_Topic': session.Session_Topic,
+                'Date': session.Date.strftime('%Y-%m-%d'),
+                'Start_Time': str(session.Start_Time),
+                'conductedby': session.conductedby,
+                'meetlink': session.meetlink,
+                'hasEnded': session.ended,
+                'videoLink': session.videoLink,
+                'attendances': {
+                    'invited_students_count': len(session.studentsinvited),
+                    'attended_students_count': attended_count
+                }
+            })
+
+        return JsonResponse(session_data, safe=False)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e),
+            'message': 'An error occurred while fetching session data'
+        }, status=500)

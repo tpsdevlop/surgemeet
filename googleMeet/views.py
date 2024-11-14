@@ -1,3 +1,6 @@
+from django.shortcuts import render
+
+# Create your views here.
 import asyncio
 from datetime import datetime, timedelta
 import json
@@ -147,12 +150,6 @@ def get_meeting_details(request, meeting_code,email):
         return JsonResponse(meeting_details)
     except Exception as error:
         return HttpResponse(f'An error occurred: {error}')
-
-
-
-
-
-
 
 def list_conferences(request,email):
     print(email)

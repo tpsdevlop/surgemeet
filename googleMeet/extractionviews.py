@@ -13,7 +13,7 @@ from google.apps import meet_v2
 from django.core.exceptions import ObjectDoesNotExist
 from googleapiclient.discovery import build
 import os
-from .models import Log, Participant, Session, UserToken
+from .models import Log, Participant, Session
 from datetime import datetime, timezone, timedelta
 
 import pytz
@@ -193,17 +193,18 @@ def get_all_participant_info_from_meeting_link(request):
             space_request = meet_v2.GetSpaceRequest(name=f'spaces/{meeting_code}')
             space_response = client.get_space(request=space_request)
             space_name = space_response.name
+            print("step2")
 
             # Step 3: List conferences associated with the space
             conference_client = meet_v2.ConferenceRecordsServiceClient(credentials=creds)
             request_obj = meet_v2.ListConferenceRecordsRequest()
             page_result = conference_client.list_conference_records(request=request_obj)
-
+            print("step3")
             # Filter conference records that match the space name
             conference_ids = [record.name.split('/')[-1] for record in page_result if record.space == space_name]
             if not conference_ids:
                 return JsonResponse({'error': 'No conferences found for the provided meeting link.'}, status=404)
-
+            print("step4")
             # Initialize session info
             session_info = {
                 "sessionInfo": [],
@@ -241,9 +242,10 @@ def get_all_participant_info_from_meeting_link(request):
                     session_info["sessionInfo"].append(session_detail)
 
                 session_info["participantInfo"].extend(participant_info['participantInfo'])
-
+            print("saving started ")
             # Save the session and participant info to the database
             save_session_info(session_info)
+            print("svaingalso happend")
 
             return JsonResponse(session_info, safe=False)
 
@@ -300,40 +302,57 @@ def get_all_participant_info_method(conference_id, email, creds, inst_name, sess
 
     return {"participantInfo": participant_info}
 
+
+
 def save_session_info(session_info):
+    print("Saving method has been triggered")
+    
     # Loop through each session in session_info
     for session_detail in session_info["sessionInfo"]:
-        # Create a new session object
-        session = Session(
-            session_id=session_detail["sessionId"],  # Use the session ID from the request
-            email=session_detail["email"],
-            inst_name=session_detail["inst_name"],
-            session_duration=session_detail["session_duration"]
-        )
-        session.save()  # Save the session to the database
-
-        # print(f"Session saved with ID: {session.session_id}")  # Debugging line
+        try:
+            # Create and save a new session object
+            session = Session(
+                session_id=session_detail["sessionId"],
+                email=session_detail["email"],
+                inst_name=session_detail["inst_name"],
+                session_duration=session_detail["session_duration"]
+            )
+            session.save()
+            print("Session saved with ID:", session.session_id)
+        except Exception as e:
+            print("Error saving session:", repr(e))
+            continue  # Skip to the next session if there's an error
 
         # Loop through participants and save their information
         for participant in session_info["participantInfo"]:
-            participant_instance = Participant(
-                session=session,  # Link to the session
-                student_id=participant.get("student_id"),  # Include student ID
-                display_name=participant["display_name"],
-                attended_time=participant["attendedTime"]
-            )
-            participant_instance.save()  # Save participant to the database
-
-            # print(f"Participant saved: {participant_instance.display_name}")  # Debugging line
-
-            # Save logs for this participant with student ID and session ID
+            print("Processing participant:", participant)
+            try:
+                Participant.objects.create(
+                        session=session,
+                        student_id=participant.get("student_id"),
+                        display_name=participant["display_name"],
+                        attended_time=participant["attendedTime"]
+                    )
+            except Participant.DoesNotExist:
+                print("", repr(participant))
+            except Exception:
+                print("COME ERRE", repr(Exception))
+                
             for log in participant.get("log", []):
-                log_instance = Log(
-                    student_id=participant.get("student_id"),  # Store student ID
-                    session_id=session_detail["sessionId"],  # Store session ID
-                    session_start_time=log["session_start_time"],
-                    session_end_time=log["session_end_time"]
-                )
-                log_instance.save()  # Save log to the database
+                try:
+                    Log.objects.create(
+                        student_id=participant.get("student_id"),
+                        session_id=session.session_id,
+                        session_start_time=log["session_start_time"],
+                        session_end_time=log["session_end_time"]
+                    )
+                except Exception as e:
+                    print("Error saving log:", repr(e))
 
-                # print(f"Log saved for student: {log_instance.student_id}")  # Debugging line
+
+
+
+
+
+
+

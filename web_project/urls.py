@@ -24,7 +24,8 @@ urlpatterns = [
     path('trainer/', include('trainer.urls')),
     path('colleges/',include('colleges.urls')),
     path('branches/',include('branches.urls')),
-    path('goooglemeet/', include('playground.urls')),
     path('userauth/',include('userauth.urls')),
     path('session/', include('meetsessions.urls')), 
+    path('goooglemeet/', include('googleMeet.urls')),
+
 ]

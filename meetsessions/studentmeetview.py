@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Session
-from playground.models import Session as PlaygroundSession, Participant
+from googleMeet.models import Session as googleMeetSession, Participant
 from django.views.decorators.csrf import csrf_exempt
 import json
 from django.http import JsonResponse
@@ -21,8 +21,8 @@ def fetch_student_attendance(request):
             for session in sessions:
                 studentsinvited_str = session.studentsinvited
                 is_invited = check_student_invitation(studentsinvited_str, student_id)
-                playground_session = PlaygroundSession.objects.filter(session_id=session.id).first()
-                total_duration = playground_session.session_duration if playground_session else "0"
+                googleMeet_session = googleMeetSession.objects.filter(session_id=session.id).first()
+                total_duration = googleMeet_session.session_duration if googleMeet_session else "0"
                 attendance_info = {
                     'student_id': student_id,
                     'display_name': "Not Attended",
