@@ -27,5 +27,7 @@ urlpatterns = [
     path('userauth/',include('userauth.urls')),
     path('session/', include('meetsessions.urls')), 
     path('goooglemeet/', include('googleMeet.urls')),
+    path('internshipreport/',include('internshipreport.urls')),
+
 
 ]

@@ -48,7 +48,8 @@ INSTALLED_APPS = [
     'branches',
     'userauth',
     'meetsessions',
-    'googleMeet'
+    'googleMeet',
+    'internshipreport'
 ]
 
 MIDDLEWARE = [
