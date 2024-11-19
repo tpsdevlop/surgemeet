@@ -1,20 +1,523 @@
+from collections import defaultdict
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from .adminflowview import ErrorLog
+from .models import *
+from django.core.exceptions import ValidationError
+import json
+from django.views.decorators.http import require_POST
+from  web_project.Blob_service import *
+from rest_framework.decorators import api_view 
+from django.db.models import QuerySet 
 from datetime import datetime, timedelta
 from googleMeet.models import Participant
-from django.views.decorators.http import require_GET
-from django.views.decorators.csrf import csrf_exempt
-from .models import *
-from django.http import HttpResponse, JsonResponse
-from collections import defaultdict
-from django.db.models.functions import Cast
+@csrf_exempt
+def create_student_details(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            student = StudentDetails(
+                StudentId=data.get('StudentId'),
+                firstName=data.get('firstName'),
+                lastName=data.get('lastName'),
+                college_Id=data.get('college_Id'),
+                CollegeName=data.get('CollegeName'),
+                Center=data.get('Center'),
+                email=data.get('email'),
+                whatsApp_No=data.get('whatsApp_No'),
+                mob_No=data.get('mob_No'),
+                sem=data.get('sem'),
+                branch=data.get('branch'),
+                status=data.get('status'),
+                user_category=data.get('user_category'),
+                reg_date=data.get('reg_date'),
+                exp_date=data.get('exp_date'),
+                score=data.get('score'),
+                progress_Id=data.get('progress_Id', {}),
+                Assignments_test=data.get('Assignments_test', {}),
+                Courses=data.get('Courses', []),
+                Course_StartTime=data.get('Course_StartTime', {})
+            )
+            student.full_clean()
+            student.save()
+
+            return JsonResponse({"message": "Student details created successfully"}, status=201)
+
+        except ValidationError as e:
+            return JsonResponse({"error": str(e)}, status=400)
+        except Exception as e:
+            return JsonResponse({"error": "An error occurred: " + str(e)}, status=400)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
 
 @csrf_exempt
-@require_GET
+def create_student_details_days_questions(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            student_days_questions = StudentDetails_Days_Questions(
+                Student_id=data.get('Student_id'),
+                Days_completed=data.get('Days_completed', {}),
+                Qns_lists=data.get('Qns_lists', {}),
+                Qns_status=data.get('Qns_status', {}),
+                Ans_lists=data.get('Ans_lists', {}),
+                Score_lists=data.get('Score_lists', {}),
+                Start_Course=data.get('Start_Course', {})
+            )
+            student_days_questions.full_clean()
+            student_days_questions.save()
+
+            return JsonResponse({"message": "Student days and questions created successfully"}, status=201)
+
+        except ValidationError as e:
+            return JsonResponse({"error": str(e)}, status=400)
+        except Exception as e:
+            return JsonResponse({"error": "An error occurred: " + str(e)}, status=400)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+def get_subject_counts(question_details):
+    categories = {"HTML": 30, "Python": 200, "SQL": 150, "Java_Script": 30}
+    subject_counts_by_student = {}
+    for question in question_details:
+        student_id = question['Student_id']
+        subject = question['Subject']
+        if student_id not in subject_counts_by_student:
+            subject_counts_by_student[student_id] = {subject: 0 for subject in categories.keys()}
+        if subject in categories:
+            subject_counts_by_student[student_id][subject] = subject_counts_by_student[student_id].get(subject, 0) + 1
+    for student_id, subject_counts in subject_counts_by_student.items():
+        for subject, count in subject_counts.items():
+            limit = categories[subject]
+            subject_counts[subject] = f"{count}/{limit}"
+    return subject_counts_by_student
+
+def overallscore(student):
+    try:
+        easy = medium = hard = 0
+        number_questions_assigned = 0
+        question_list = {
+            "HTMLCSS", "Java_Script", "SQL_Day_1", "SQL_Day_2", "SQL_Day_3",
+            "SQL_Day_4", "SQL_Day_5", "SQL_Day_6", "SQL_Day_7", "SQL_Day_8",
+            "SQL_Day_9", "SQL_Day_10", "Python_Day_1", "Python_Day_2",
+            "Python_Day_3", "Python_Day_4", "Python_Day_5"
+        }
+        qns_lists = student['Qns_lists']
+        for topic in question_list:
+            questions_per_list = qns_lists.get(topic)
+            if not questions_per_list:
+                continue  
+            number_questions_assigned += len(questions_per_list)
+            for question in questions_per_list:
+                if len(question) >= 4:
+                    difficulty = question[-4]
+                    if difficulty == "E":
+                        easy += 1
+                    elif difficulty == "M":
+                        medium += 1
+                    else:
+                        hard += 1
+
+        totalscore = (5 * easy) + (10 * medium) + (15 * hard)
+
+        return {
+            "totalscore": totalscore,
+            "totalnumofquestionassigned": number_questions_assigned
+        }
+    
+    except Exception as e:
+        return {"error": str(e)}
+
+def getRankings(rankings_data):
+    try:
+        # Organize rankings by course using the pre-fetched data
+        organized_rankings = {}
+        for rank in rankings_data:
+            course = rank['Course']
+            student_id = rank['StudentId']
+            
+            if course not in organized_rankings:
+                organized_rankings[course] = {}
+                
+            organized_rankings[course][student_id] = {
+                'rank': str(rank['Rank']),
+            }
+            
+        return organized_rankings
+    except Exception as e:
+        print(f"Error in getRankings: {str(e)}")
+        return {}
+
+
+def combine_data(result, userprogress):
+    userprogress_dict = {item['id']: item for item in userprogress}
+    combined = []
+    for student in result:
+        student_id = student['id']
+        if student_id in userprogress_dict:
+            combined_entry = {**student, **userprogress_dict[student_id]}
+        else:
+            combined_entry = student
+        combined.append(combined_entry)
+
+    return combined
+def scorescumulation(student):
+    score_sum = 0
+    score_HTMLCSS = 0
+    score_breakdown = {}
+    
+    score_lists = student.get('Score_lists', {})
+    
+    for key, value in score_lists.items():
+        if isinstance(value, str) and '/' in value:
+            try:
+                score_value = float(value.split("/")[0])
+            except ValueError:
+                continue
+        elif isinstance(value, (int, float)):
+            score_value = value
+        else:
+            continue
+        if key in {"HTMLScore", "CSSScore"}:
+            score_HTMLCSS += score_value
+        else:
+            score_sum += score_value
+        
+        score_breakdown[key] = score_value
+    total_HTMLCSS_half = score_HTMLCSS / 2
+    score_sum += total_HTMLCSS_half
+
+    score_breakdown['HTMLCSSScore'] = round(total_HTMLCSS_half, 2)
+    
+    return {
+        'Total_Score': score_sum,
+        'Score_Breakdown': score_breakdown
+    }
+
+
+
+@api_view(['GET'])
+def getSTdDaysdetailes(req):
+    try:
+        mainuser = StudentDetails_Days_Questions.objects.all().values( )
+        if mainuser is None:
+            HttpResponse('No data found')
+        return HttpResponse(json.dumps( list(mainuser) ), content_type='application/json')    
+    except Exception as e:
+        return HttpResponse('An error occurred'+str(e))
+
+@csrf_exempt
+@require_POST
+def per_student_html_CSS_data(request):
+    try:
+        data = json.loads(request.body)
+        student_id = data.get('student_id')
+
+        if not student_id:
+            return JsonResponse({'error': 'student_id is required'}, status=400)
+
+        student = StudentDetails_Days_Questions.objects.filter(pk=student_id).values().first()
+        if not student:
+            return JsonResponse({'error': 'Student not found'}, status=404)
+
+        answered_questions = list(QuestionDetails_Days.objects.filter(Student_id=student_id).values())
+
+        # Process HTML and CSS questions
+        questions_data = {}
+        for subject in ['HTML', 'CSS']:
+            if subject in student['Qns_status']:
+                for qn_id, status in student['Qns_status'][subject].items():
+                    if qn_id not in questions_data:
+                        questions_data[qn_id] = {
+                            'qn_id': qn_id,
+                            'html_status': 0,
+                            'html_answer_status': 'NA',
+                            'html_score': 'NA',
+                            'html_testcases_passed':'NA',
+                            'css_status': 0,
+                            'css_answer_status': 'NA',
+                            'css_score': 'NA',
+                            'css_testcases_passed': 'NA',
+                        }
+                    
+                    subject_lower = subject.lower()
+                    questions_data[qn_id][f'{subject_lower}_status'] = status
+                    
+                    # Check if the question has been answered
+                    answered_question = next((q for q in answered_questions if q['Qn'] == qn_id and q['Subject'] == subject), None)
+                    if answered_question:
+                        questions_data[qn_id].update({
+                            f'{subject_lower}_answer_status': 'Correct' if answered_question['Score'] == answered_question['Score'] else 'Incorrect',
+                            f'{subject_lower}_score': answered_question['Score'],
+                            # f'{subject_lower}_total_score': answered_question['Total_Score'],
+                            f'{subject_lower}_testcases_passed': answered_question['Result']['TestCases']['Testcase']
+                        })
+
+        # Get student details
+        student_details = studentdata(student_id)
+
+        response_data = {
+            'student_id': student['Student_id'],
+            'name': student_details['name'],
+            'college': student_details['college'],
+            'branch': student_details['branch'],
+            'phone':student_details['phone'],
+            'email': student_details['email'],
+            'questions': list(questions_data.values())
+        }
+
+        return JsonResponse(response_data)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_POST
+def per_student_JS_data(request):
+    try:
+        data = json.loads(request.body)
+        student_id = data.get('student_id')
+
+        student = StudentDetails_Days_Questions.objects.filter(pk=student_id).values()
+        studenttsdata = studentdata(student_id)
+        # print(studenttsdata)
+        studentQuesList = []
+        if "Java_Script" in student[0]['Qns_lists']:
+            studentQuesList.append(student[0]['Qns_lists']['Java_Script'])
+        else:
+            studentQuesList.append(["no data is found"])
+        studentsJava_ScriptStatus = []
+        if "Java_Script" in student[0]['Qns_status'].keys():
+            for i in student[0]['Qns_status']['Java_Script'].values():
+                studentsJava_ScriptStatus.append(i)
+        else:
+            studentsJava_ScriptStatus.append(["no data is found"])
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    if not student_id:
+        return JsonResponse({'error': 'student_id is required'}, status=400)
+    return JsonResponse({
+        'student_id': student[0]['Student_id'],
+        'Name':studenttsdata['name'],
+        'college':studenttsdata['college'],
+        'branch':studenttsdata['branch'],
+        'phone':studenttsdata['phone'],
+        'email': studenttsdata['email'],
+        'studentQuesList': studentQuesList,
+        "Javascript":studentsJava_ScriptStatus,
+    })
+
+
+# this method is to get answers of a particular html css question
+@csrf_exempt
+@require_POST
+def per_student_ques_detials(request):
+    try:
+        data = json.loads(request.body)
+        student_id = data.get('student_id')
+        question_id = data.get('question_id')
+        if not student_id or not question_id:
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
+        studenttsdata = studentdata(student_id)
+        studenthtml_queryset = QuestionDetails_Days.objects.filter(
+            Student_id=student_id,
+            Qn=question_id,
+            Subject="HTML"
+        ).values()
+        studentCSS_queryset = QuestionDetails_Days.objects.filter(
+            Student_id=student_id,
+            Qn=question_id,
+            Subject="CSS"
+        ).values()
+        stduentHTMLAns = {}
+        studentCSSAns = {}
+        if  len(studenthtml_queryset)>0:
+            stduentHTMLAns = studenthtml_queryset[0]
+            HTMLdict = {
+                'question':get_questions(question_id,"HTMLCSS"),
+                'Attempts': stduentHTMLAns["Attempts"],
+                'Score':stduentHTMLAns["Score"],
+                'subject':"HTML",
+                'ans':stduentHTMLAns["Ans"]
+            }
+            stduentHTMLAns = HTMLdict
+        else :
+            return("no data found + str(stduentHTMLAns)")
+            # print("no data found" + str(stduentHTMLAns))
+
+        if len(studentCSS_queryset)>0:
+            studentCSSAns = studentCSS_queryset[0]
+            CSSdict = {
+                'Attempts': studentCSSAns["Attempts"],
+                'Score':studentCSSAns["Score"],
+                'subject':"CSS",
+                'ans':studentCSSAns["Ans"]
+            }
+            studentCSSAns = CSSdict
+        else :
+            pass
+            # print("no data found" + str(studentCSSAns))
+        return JsonResponse({
+                'student_id': student_id,
+                'Name':studenttsdata['name'],
+                'college':studenttsdata['college'],
+                'branch':studenttsdata['branch'],
+
+                'question_id': question_id,
+                'htmlans': stduentHTMLAns,
+                'CSSans':studentCSSAns
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+@csrf_exempt
+@require_POST
+def per_student_JS_ques_detials(request):
+    try:
+        data = json.loads(request.body)
+        student_id = data.get('student_id')
+        question_id = data.get('question_id')
+        if not student_id or not question_id:
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
+        studenttsdata = studentdata(student_id)
+        studentJS_queryset = QuestionDetails_Days.objects.filter(
+            Student_id=student_id,
+            Qn=question_id,
+            Subject="Java_Script"
+        ).values()
+        stduentJavaScriptAns = {}
+        if  len(studentJS_queryset)>0:
+            stduentJavaScriptAns = studentJS_queryset[0]
+            JSdict = {
+                'question':get_questions(question_id,"Java_Script"),
+                'Attempts': stduentJavaScriptAns["Attempts"],
+                'Score':stduentJavaScriptAns["Score"],
+                'subject':"Java_Script",
+                'ans':stduentJavaScriptAns["Ans"]
+            }
+            stduentJavaScriptAns = JSdict
+            # print(stduentJavaScriptAns)
+        else :
+            return ("no data found")
+            # print("no data found" + str(stduentJavaScriptAns))
+        return JsonResponse({
+                'student_id': student_id,
+                'Name':studenttsdata['name'],
+                'college':studenttsdata['college'],
+                'branch':studenttsdata['branch'],
+                'phone':studenttsdata['mob_No'],
+                'email': studenttsdata['email'],
+                'question_id': question_id,
+                'JSAns': stduentJavaScriptAns,
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+
+
+def get_questions(questionid,course):
+    CONTAINER ="internship"
+    qnsdata = download_blob2('Internship_days_schema/'+course+ '/'+questionid+'.json',CONTAINER)
+    qnsdata = json.loads(qnsdata)
+    return qnsdata["Qn"]
+
+def studentdata(studentid):
+    try:
+        stduent = StudentDetails.objects.filter(pk=studentid).values()
+        print(stduent)
+        stduentsendData = {
+            'id': stduent[0]['StudentId'],
+            'name': stduent[0]['firstName'],
+            'college': stduent[0]['college_Id'],
+            'branch': stduent[0]['branch'],
+            'phone':stduent[0]['mob_No'],
+            'email': stduent[0]['email']
+        }
+
+        return stduentsendData
+    except Exception as e:
+        return {} 
+    
+def get_total_durations_for_all_students(attendance_records, subject=None):
+    # Define date ranges for each subject
+    subjects_date_ranges = {
+        "HTMLCSS": ("2024-10-03", "2024-10-12"),
+        "Java_Script": ("2024-10-14", "2024-11-02"),
+        "SQL": ("2024-11-04", "2024-11-13"),
+        "Python": ("2024-11-15", "2024-11-24"),
+        "Internship": ("2024-11-26", "2024-12-31")
+    }
+
+    # Convert date ranges to aware datetime objects
+    subjects_date_ranges = {
+        subject_name: (
+            timezone.make_aware(datetime.strptime(start, '%Y-%m-%d')), 
+            timezone.make_aware(datetime.strptime(end, '%Y-%m-%d'))
+        ) for subject_name, (start, end) in subjects_date_ranges.items()
+    }
+
+    student_subject_durations = defaultdict(lambda: defaultdict(float))
+
+    for record in attendance_records:
+        student_id = record['SID']
+        login_time = record['Login_time']
+        duration = record['Duration']
+
+        # Track total duration for all subjects
+        student_subject_durations[student_id]['All'] += duration
+
+        for subject_name, (start_date, end_date) in subjects_date_ranges.items():
+            if start_date <= login_time <= end_date:
+                student_subject_durations[student_id][subject_name] += duration
+
+    # Convert seconds to hours and round to 2 decimal places
+    for student_id, durations in student_subject_durations.items():
+        student_subject_durations[student_id] = {
+            subject_name: round(duration / 3600, 2) 
+            for subject_name, duration in durations.items()
+        }
+
+    # If subject is specified, return only that subject's data
+    if subject:
+        filtered_durations = {}
+        for student_id, durations in student_subject_durations.items():
+            if subject in durations:
+                filtered_durations[student_id] = {subject: durations[subject]}
+        return filtered_durations
+
+    return student_subject_durations
+
+from meetsessions.models import Session
+def get_online_attendance(student_id,sessions,sessionscount):
+    subjects = ["HTMLCSS", "Java_Script", "SQL", "Python", "Internship"]
+    invited_sessions_dict = {subject: [] for subject in subjects}
+    for session in sessions:
+        invited_sessions_dict[session["subject"]].append(session["id"])
+    participatedattendedsessions = list(Participant.objects.filter(student_id=student_id).values_list("session_id", flat=True))
+    totalcount = len(participatedattendedsessions)
+    attendance_summary = {}
+    for subject, invited_sessions in invited_sessions_dict.items():
+        attended_count = sum(1 for session in invited_sessions if str(session) in participatedattendedsessions)
+        invited_count = len(invited_sessions)
+        attendance_summary[subject] = {
+            'attended': attended_count,
+            'invited': invited_count
+        }
+    attendance_summary["All"]={
+        'attended':totalcount,
+        'invited':sessionscount
+    }
+    return attendance_summary    
+    
+@csrf_exempt
 def frontpagedeatialsmethod(request):
     try:
         # Define subjects and get sessions only once
         subjects = ["HTMLCSS", "Java_Script", "SQL", "Python", "Internship"]
         sessions = Session.objects.filter(subject__in=subjects).values("id", "subject", "studentsinvited")
-        sessionscount = sessions.count()
+        sessionscount = Session.objects.all().count()
         # Get student details
         student_details = list(StudentDetails.objects.all().values(
             'StudentId',
@@ -31,11 +534,11 @@ def frontpagedeatialsmethod(request):
         ).order_by('StudentId'))
         
         # Filter out admin/trainer/test accounts
-        # student_details = [
-        #     student for student in student_details 
-        #     if not any(excluded in student['StudentId'] 
-        #                for excluded in ['ADMI', 'TRAI', 'TEST'])
-        # ]
+        student_details = [
+            student for student in student_details 
+            if not any(excluded in student['StudentId'] 
+                       for excluded in ['ADMI', 'TRAI', 'TEST'])
+        ]
         
         if not student_details:
             return JsonResponse({'message': 'No data found'}, status=404)
@@ -156,159 +659,9 @@ def frontpagedeatialsmethod(request):
         print(f"Error in frontpagedeatialsmethod: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
 
-def overallscore(student):
-    try:
-        easy = medium = hard = 0
-        number_questions_assigned = 0
-        question_list = {
-            "HTMLCSS", "Java_Script", "SQL_Day_1", "SQL_Day_2", "SQL_Day_3",
-            "SQL_Day_4", "SQL_Day_5", "SQL_Day_6", "SQL_Day_7", "SQL_Day_8",
-            "SQL_Day_9", "SQL_Day_10", "Python_Day_1", "Python_Day_2",
-            "Python_Day_3", "Python_Day_4", "Python_Day_5"
-        }
-        qns_lists = student['Qns_lists']
-        for topic in question_list:
-            questions_per_list = qns_lists.get(topic)
-            if not questions_per_list:
-                continue  
-            number_questions_assigned += len(questions_per_list)
-            for question in questions_per_list:
-                if len(question) >= 4:
-                    difficulty = question[-4]
-                    if difficulty == "E":
-                        easy += 1
-                    elif difficulty == "M":
-                        medium += 1
-                    else:
-                        hard += 1
-
-        totalscore = (5 * easy) + (10 * medium) + (15 * hard)
-
-        return {
-            "totalscore": totalscore,
-            "totalnumofquestionassigned": number_questions_assigned
-        }
-    
-    except Exception as e:
-        return {"error": str(e)}
-
-def get_total_durations_for_all_students(attendance_records, subject=None):
-    # Define date ranges for each subject
-    subjects_date_ranges = {
-        "HTMLCSS": ("2024-10-03", "2024-10-12"),
-        "Java_Script": ("2024-10-14", "2024-11-02"),
-        "SQL": ("2024-11-04", "2024-11-13"),
-        "Python": ("2024-11-15", "2024-11-24"),
-        "Internship": ("2024-11-26", "2024-12-31")
-    }
-
-    # Convert date ranges to aware datetime objects
-    subjects_date_ranges = {
-        subject_name: (
-            timezone.make_aware(datetime.strptime(start, '%Y-%m-%d')), 
-            timezone.make_aware(datetime.strptime(end, '%Y-%m-%d'))
-        ) for subject_name, (start, end) in subjects_date_ranges.items()
-    }
-
-    student_subject_durations = defaultdict(lambda: defaultdict(float))
-
-    for record in attendance_records:
-        student_id = record['SID']
-        login_time = record['Login_time']
-        duration = record['Duration']
-
-        # Track total duration for all subjects
-        student_subject_durations[student_id]['All'] += duration
-
-        for subject_name, (start_date, end_date) in subjects_date_ranges.items():
-            if start_date <= login_time <= end_date:
-                student_subject_durations[student_id][subject_name] += duration
-
-    # Convert seconds to hours and round to 2 decimal places
-    for student_id, durations in student_subject_durations.items():
-        student_subject_durations[student_id] = {
-            subject_name: round(duration / 3600, 2) 
-            for subject_name, duration in durations.items()
-        }
-
-    # If subject is specified, return only that subject's data
-    if subject:
-        filtered_durations = {}
-        for student_id, durations in student_subject_durations.items():
-            if subject in durations:
-                filtered_durations[student_id] = {subject: durations[subject]}
-        return filtered_durations
-
-    return student_subject_durations
-def get_subject_counts(question_details):
-    categories = {"HTML": 30, "Python": 200, "SQL": 150, "Java_Script": 30}
-    subject_counts_by_student = {}
-    for question in question_details:
-        student_id = question['Student_id']
-        subject = question['Subject']
-        if student_id not in subject_counts_by_student:
-            subject_counts_by_student[student_id] = {subject: 0 for subject in categories.keys()}
-        if subject in categories:
-            subject_counts_by_student[student_id][subject] = subject_counts_by_student[student_id].get(subject, 0) + 1
-    for student_id, subject_counts in subject_counts_by_student.items():
-        for subject, count in subject_counts.items():
-            limit = categories[subject]
-            subject_counts[subject] = f"{count}/{limit}"
-    return subject_counts_by_student
 
 
 
-def getRankings(rankings_data):
-    try:
-        # Organize rankings by course using the pre-fetched data
-        organized_rankings = {}
-        for rank in rankings_data:
-            course = rank['Course']
-            student_id = rank['StudentId']
-            
-            if course not in organized_rankings:
-                organized_rankings[course] = {}
-                
-            organized_rankings[course][student_id] = {
-                'rank': str(rank['Rank']),
-            }
-            
-        return organized_rankings
-    except Exception as e:
-        print(f"Error in getRankings: {str(e)}")
-        return {}
-def scorescumulation(student):
-    score_sum = 0
-    score_HTMLCSS = 0
-    score_breakdown = {}
-    
-    score_lists = student.get('Score_lists', {})
-    
-    for key, value in score_lists.items():
-        if isinstance(value, str) and '/' in value:
-            try:
-                score_value = float(value.split("/")[0])
-            except ValueError:
-                continue
-        elif isinstance(value, (int, float)):
-            score_value = value
-        else:
-            continue
-        if key in {"HTMLScore", "CSSScore"}:
-            score_HTMLCSS += score_value
-        else:
-            score_sum += score_value
-        
-        score_breakdown[key] = score_value
-    total_HTMLCSS_half = score_HTMLCSS / 2
-    score_sum += total_HTMLCSS_half
-
-    score_breakdown['HTMLCSSScore'] = round(total_HTMLCSS_half, 2)
-    
-    return {
-        'Total_Score': score_sum,
-        'Score_Breakdown': score_breakdown
-    }
 
 from datetime import datetime
 from django.utils import timezone
@@ -388,7 +741,7 @@ def delay(student_id, context):
                     
                     if type(delay) == int and delay > 0 :
                         delay -= 1
-                    # print(delay)
+                    print(delay)
                     result[course] = {
                         'total_days': total_days,
                         'delay': delay
@@ -575,70 +928,173 @@ def last_submit(ex):
             delay = (existing - end).days
 
     return delay
-from meetsessions.models import Session
-from bson.objectid import ObjectId
 
-def get_online_attendance(student_id, sessions, sessionscount):
+@csrf_exempt
+@require_POST
+def single_student_details(request):
     try:
-        subjects = ["HTMLCSS", "Java_Script", "SQL", "Python", "Internship"]
-        attendance_summary = {subject: {'attended': 0, 'invited': 0} for subject in subjects}
+        # Get student ID from request body
+        data = json.loads(request.body)
+        student_id = data.get('student_id')
+        
+        # Get student basic details
+        student = StudentDetails.objects.filter(StudentId=student_id).values(
+            'StudentId',
+            'firstName',
+            'lastName',
+            'college_Id',
+            'branch',
+            'CGPA',
+            'score',
+            'Course_Time',
+            'user_Type',
+            'email',
+            'mob_No'
+        ).first()
+        
+        if not student:
+            return JsonResponse({'message': 'Student not found'}, status=404)
 
-        # Organize sessions by subject
-        subject_sessions = {}
-        for session in sessions:
-            subject = session['subject']
-            if subject not in subject_sessions:
-                subject_sessions[subject] = []
-            # Convert MongoDB ObjectId to string if necessary
-            session_id = str(session['id']) if isinstance(session['id'], ObjectId) else str(session['id'])
-            subject_sessions[subject].append(session_id)
-
-        try:
-            # MongoDB-specific query for participants
-            participated_sessions = list(
-                Participant.objects.filter(student_id=student_id)
-                .values_list('session_id', flat=True)
-            )
-            
-            # Convert all ObjectIds to strings
-            participated_sessions = [
-                str(session_id) if isinstance(session_id, ObjectId) else str(session_id)
-                for session_id in participated_sessions
-            ]
-            
-        except Exception as e:
-            print(f"Error fetching participant sessions: {repr(e)}")
-            return JsonResponse({
-                "status": 500,
-                "message": "Error fetching participant data",
-                "error": str(e)
-            })
-
-        # Calculate attendance for each subject
-        for subject in subjects:
-            invited_sessions = subject_sessions.get(subject, [])
-            # Using sets for faster comparison
-            invited_set = set(invited_sessions)
-            participated_set = set(participated_sessions)
-            attended_count = len(invited_set.intersection(participated_set))
-
-            attendance_summary[subject] = {
-                'attended': attended_count,
-                'invited': len(invited_sessions)
-            }
-
-        # Calculate overall attendance
-        attendance_summary["All"] = {
-            'attended': len(participated_sessions),
-            'invited': sessionscount
+        # Course duration mapping
+        course_durations = {
+            'HTMLCSS': 10,
+            'Java_Script': 20,
+            'SQL': 10,
+            'Python': 10
         }
 
-        return attendance_summary
+        # Get course time from student data
+        course_time = student.get('Course_Time', {})
+
+        # Get all required data for the student
+        questions = list(QuestionDetails_Days.objects.filter(
+            Student_id=student_id
+        ).values(
+            'Subject', 
+            'DateAndTime',
+            'Score',
+            'Attempts',
+            'Ans',
+            'Result'
+        ))
+
+        days_questions = StudentDetails_Days_Questions.objects.filter(
+            Student_id=student_id
+        ).values().first()
+
+        # Get end course timings from days_questions
+        end_course_timings = days_questions.get('End_Course', {}) if days_questions else {}
+
+        attendance = list(Attendance.objects.filter(
+            SID=student_id
+        ).values('Login_time', 'Duration', 'Last_update'))
+
+        rankings = list(Rankings.objects.filter(
+            StudentId=student_id
+        ).values('Course', 'Rank'))
+
+        # Convert rankings to a dictionary for easier lookup
+        rankings_dict = {rank['Course']: rank['Rank'] for rank in rankings}
+        
+        # Get delay context data
+        delay_context = {
+            'student_data': student,
+            'questions_data': questions,
+            'days_questions': days_questions,
+            'attendance_data': attendance,
+            'rankings_data': rankings
+        }
+        
+        # Calculate delays for all subjects
+        delays = delay(student_id, delay_context)
+
+        # New delay calculation function
+        def calculate_delay(course_start, course_end, duration_days):
+            if course_start and course_end:
+                days_diff = (course_end - course_start).days
+                if days_diff > duration_days:
+                    return days_diff - duration_days
+            return 0
+
+        # Create subject-wise data
+        subject_data = []
+        for subject in ["HTMLCSS", "Java_Script", "SQL", "Python", "Internship"]:
+            if subject != "Internships":  # Skip Internship as it's not in course time
+                
+
+                if subject == "HTMLCSS":
+                    questions_count = len([q for q in questions if "HTML" in q['Subject'].upper()])
+                else:
+                    questions_count = len([q for q in questions if q['Subject'] == subject])
+
+                # Get course start and end times
+                course_start = None
+                course_end = None
+                
+                if course_time and subject in course_time:
+                    course_start = course_time[subject].get('Start')
+                
+                if end_course_timings:
+                    if subject in ['SQL', 'Python']:
+                        day_10_key = f"{subject}_Day_10"
+                        subject_day_10 = end_course_timings.get(day_10_key)
+                        subject_end = end_course_timings.get(subject)
+                        course_end = subject_day_10 or subject_end
+                    else:
+                        course_end = end_course_timings.get(subject)
+                
+                # Calculate delay using the new function
+                delay_value = "--"
+                if course_start and course_end:
+                    delay_value = calculate_delay(course_start, course_end, course_durations.get(subject, 0))
+                
+                # Format course start and end dates
+                course_start_str = course_start.strftime('%Y-%m-%d') if course_start else "--"
+                course_end_str = course_end.strftime('%Y-%m-%d %H:%M:%S') if course_end else "--"
+
+                # Get score breakdown and rank
+                score_breakdown = scorescumulation(days_questions).get('Score_Breakdown', {})
+                subject_info = {
+                    "Subject": subject,
+                    "Questions_Answered": questions_count,
+                    "Delay": delay_value,
+                    "Score": score_breakdown.get(f'{subject}Score', 0.0),
+                    "Rank": rankings_dict.get(subject, "--"),
+                    "Course_Start": course_start_str,
+                    "Course_End": course_end_str,
+                    "Duration_Days": course_durations.get(subject, "--")
+                }
+                subject_data.append(subject_info)
+
+        # Create response with student basic info and subject details
+        response_data = {
+            "student_info": {
+                "id": student['StudentId'],
+                "name": f"{student['firstName']} {student['lastName']}",
+                "college": student['college_Id'],
+                "branch": student['branch'],
+                "email": student['email'],
+                "phone": student['mob_No']
+            },
+            "subject_details": subject_data
+        }
+
+        return JsonResponse(response_data, safe=False)
 
     except Exception as e:
-        print(f"General error in get_online_attendance: {repr(e)}")
-        return JsonResponse({
-            "status": 500,
-            "message": "An error occurred while processing attendance data",
-            "error": str(e)
-        })
+        print(f"Error in single_student_details: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+def calculate_delay(course_start, course_end, expected_duration):
+    """Calculate delay based on course start and end dates."""
+    if course_start and course_end:
+        actual_duration = (course_end - course_start).days
+        delay = max(0, actual_duration - expected_duration)
+        return {
+            "total_days": actual_duration,
+            "delay": delay
+        }
+    return {"total_days": "NA", "delay": "NA"}
+
+
+

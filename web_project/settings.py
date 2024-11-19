@@ -87,11 +87,11 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:5500', 
     'http://127.0.0.1:5501',
     'http://localhost:5173', 
-    'https://surgemeetlink.azurewebsites.net/',
+    # 'https://surgemeetlink.azurewebsites.net/',
 ]
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
-    'https://surgemeet.azurewebsites.net/',
+    # 'https://surgemeet.azurewebsites.net/',
 ]
 
 
@@ -203,7 +203,9 @@ USE_I18N = True
 
 USE_TZ = True
 
-
+AZURE_ACCOUNT_NAME = 'storeholder'
+AZURE_ACCOUNT_KEY = 'QxlUJdp8eSoPeQPas4NigSkXg6KMep7z+fPQ5CpPm0kRfjg7Q0lFmVEIyhU4ohFLFdSqntDAG6MY84elTfecnw=='
+AZURE_CONTAINER = 'tpdata'
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
