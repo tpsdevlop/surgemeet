@@ -78,7 +78,7 @@ def create_student_details_days_questions(request):
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
 def get_subject_counts(question_details):
-    categories = {"HTML": 30, "Python": 200, "SQL": 150, "Java_Script": 30}
+    categories = {"HTML": 30, "Python": 150, "SQL": 150, "Java_Script": 30}
     subject_counts_by_student = {}
     for question in question_details:
         student_id = question['Student_id']

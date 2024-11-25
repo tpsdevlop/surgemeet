@@ -90,7 +90,7 @@ class ErrorLogs(models.Model):
     StudentId       = models.CharField(max_length=15)
     Email           = models.EmailField()
     Name            = models.CharField(max_length=25)
-    Occrued_time    = models.DateTimeField()
+    Occurred_time    = models.DateTimeField()
     Error_msg       = models.TextField()
     Stack_trace     = models.TextField()
     User_agent      = models.TextField()
