@@ -29,5 +29,5 @@ urlpatterns = [
     path('bugscount/', get_bug_count, name='bugscount'),
     path('active-users/', get_active_users, name='active_users'),
     path('jjjjj/',getSTdDaysdetailes,name='jjjjj'),
-    path ('runpy/',run_python ),
+    # path ('runpy/',run_python ),
 ]

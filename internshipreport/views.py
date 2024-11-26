@@ -382,6 +382,7 @@ def per_student_JS_ques_detials(request):
         if not student_id or not question_id:
             return JsonResponse({'error': 'Missing required fields'}, status=400)
         studenttsdata = studentdata(student_id)
+        # print(studenttsdata)
         studentJS_queryset = QuestionDetails_Days.objects.filter(
             Student_id=student_id,
             Qn=question_id,
@@ -407,7 +408,7 @@ def per_student_JS_ques_detials(request):
                 'Name':studenttsdata['name'],
                 'college':studenttsdata['college'],
                 'branch':studenttsdata['branch'],
-                'phone':studenttsdata['mob_No'],
+                'phone':studenttsdata['phone'],
                 'email': studenttsdata['email'],
                 'question_id': question_id,
                 'JSAns': stduentJavaScriptAns,
@@ -426,7 +427,7 @@ def get_questions(questionid,course):
 def studentdata(studentid):
     try:
         stduent = StudentDetails.objects.filter(pk=studentid).values()
-        print(stduent)
+        # print(stduent)
         stduentsendData = {
             'id': stduent[0]['StudentId'],
             'name': stduent[0]['firstName'],
