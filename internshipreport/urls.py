@@ -4,6 +4,7 @@ from .sqlpythonview import *
 from .bugsview import *
 from .adminflowview import *
 from .adminsmyview import *
+from .pythonrunningtest import *
 urlpatterns = [
     path('student-details/', create_student_details, name='student-details-create'),
     path('student-details-days-questions/', create_student_details_days_questions, name='student-details-days-questions-create'),
@@ -28,5 +29,5 @@ urlpatterns = [
     path('bugscount/', get_bug_count, name='bugscount'),
     path('active-users/', get_active_users, name='active_users'),
     path('jjjjj/',getSTdDaysdetailes,name='jjjjj'),
-
+    path ('runpy/',run_python ),
 ]
