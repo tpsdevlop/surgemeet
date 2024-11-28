@@ -17,9 +17,16 @@ def download_blob2(blob_name,container_client):
 def get_blob_container_client():
     blob_service_client = get_blob_service_client()
     return blob_service_client.get_container_client(AZURE_CONTAINER)
-
+def get_blob_container_client2():
+    blob_service_client = get_blob_service_client()
+    return blob_service_client.get_container_client("internship")
 def download_blob(blob_name):
     container_client = get_blob_container_client()
+    blob_client = container_client.get_blob_client(blob_name)
+    blob_data = blob_client.download_blob().readall()
+    return blob_data
+def download_blob2(blob_name):
+    container_client = get_blob_container_client2()
     blob_client = container_client.get_blob_client(blob_name)
     blob_data = blob_client.download_blob().readall()
     return blob_data

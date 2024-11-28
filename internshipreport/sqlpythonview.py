@@ -153,6 +153,7 @@ def getreport(request, student_id, course, day):
         if day.startswith('day'):
             day_no = day[3:]  # Removes 'day' prefix and gets the number
             day_formatted = f"Day_{day_no}"  # Format to 'Day_X'
+            print(day_no)
         else:
             return JsonResponse({"error": "Invalid day format"}, status=status.HTTP_400_BAD_REQUEST)
        
@@ -185,8 +186,10 @@ def getreport(request, student_id, course, day):
             total_out_of += out_of
             q_detail = question_details.filter(Qn=q).first()
             try:
-                blob_name = f"Question/{str(q)[1:13]}/{str(q)}.json"
-                qndata = download_blob(blob_name)
+                blob_name = f"Internship_days_schema/{course}/Day_{day_no}/{q}.json"
+                # print(blob_name)
+                qndata = download_blob2(blob_name)
+                # print("lets do something\t",qndata)
                 json_content_str = qndata.decode('utf-8')
                 question_data = json.loads(json_content_str)
                 question_name = question_data.get('Qn', 'Unknown')
