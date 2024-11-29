@@ -666,8 +666,9 @@ def frontpagedeatialsmethod(request):
 
 from datetime import datetime
 from django.utils import timezone
-from datetime import datetime
+from datetime import datetime,date
 from django.utils import timezone
+
 
 def delay(student_id, context):
     try:
@@ -676,35 +677,26 @@ def delay(student_id, context):
             return {
                 "HTMLCSS": {"total_days": 10, "delay": "0"},
                 "Java_Script": {"total_days": 21, "delay": "0"},
-                "SQL": {"total_days": 10, "delay": 0},
-                "Python": {"total_days": 10, "delay": 0}
+                "SQL": {"total_days": 15, "delay": 0},
+                "Python": {"total_days": 15, "delay": 0}
             }
-
-        # Define course durations
         course_durations = {
             "HTMLCSS": 10,
             "Java_Script": 21,
             "SQL": 10,
-            "Python": 10
+            "Python": 15
         }
-
         course_time = student_data['Course_Time']
         days_questions = context['days_questions']
-        
         ended_courses = {}
         started_courses = {}
         list_of_course = []
         current_time = datetime.now()
-
-        # Process course times
         for course, timings in course_time.items():
-            if not timings or 'Start' not in timings:  # Skip if no timing data
+            if not timings or 'Start' not in timings:
                 continue
-                
             start_time = datetime.strptime(timings['Start'], "%Y-%m-%d") if isinstance(timings['Start'], str) else timings['Start']
             end_time = datetime.strptime(timings['End'], "%Y-%m-%d") if isinstance(timings['End'], str) else timings['End']
-
-            # Handle ongoing SQL and Python courses
             if course in ["SQL", "Python"]:
                 if current_time > start_time:
                     duration = (end_time - start_time).days + 1
@@ -712,8 +704,6 @@ def delay(student_id, context):
                         'Start Time': start_time,
                         'days': duration
                     }
-
-            # Handle completed courses
             if end_time < current_time:
                 duration = (end_time - start_time).days + 1
                 ended_courses[course] = {
@@ -721,12 +711,45 @@ def delay(student_id, context):
                     'days': duration
                 }
                 list_of_course.append(course)
-
         result = {}
         days = days_questions
+        def calculate_python_delay(started_courses, days):
+            python_deadline = datetime(datetime.now().year, 12, 1)
+
+            if started_courses.get('Python'):
+                python_completed = (
+                    days and 
+                    'Python_Day_10' in days.get('Ans_lists', {}) and 
+                    'Python_Day_10' in days.get('Qns_lists', {})
+                )
+
+                if python_completed:
+                    # Handle different types of last submission time
+                    last_submission_time = days['End_Course']['Python_Day_10']
+                    
+                    # Convert to datetime if it's not already
+                    if isinstance(last_submission_time, str):
+                        last_submission_time = datetime.strptime(last_submission_time, "%Y-%m-%d")
+                    elif isinstance(last_submission_time, date):
+                        last_submission_time = datetime.combine(last_submission_time, datetime.min.time())
+                    # print(last_submission_time,python_deadline)
+                    if last_submission_time > python_deadline:
+                        delay = (last_submission_time - python_deadline).days
+                    else:
+                        delay = 0
+                    # print(delay)
+                else:
+                    # If Python course is not completed
+                    current = datetime.utcnow() + timedelta(hours=5, minutes=30)
+                    if current > python_deadline:
+                        delay = (current - python_deadline).days
+                    else:
+                        delay = 0
+
+                return delay
+            return 0
         
         if days:
-            # Handle completed courses (HTMLCSS and JavaScript)
             for course in list_of_course:
                 total_days = ended_courses.get(course, {}).get('days', 0)
                 
@@ -740,14 +763,13 @@ def delay(student_id, context):
                     else:
                         delay = compare_w_current(ended_courses[course]['End Time'])
                     
-                    if type(delay) == int and delay > 0 :
+                    if type(delay) == int and delay > 0:
                         delay -= 1
-                    print(delay)
+                    # print(delay)
                     result[course] = {
                         'total_days': total_days,
                         'delay': delay
                     }
-                
                 elif course in days['Qns_lists'] and course in days['Ans_lists']:
                     if len(days['Qns_lists'][course]) == len(days['Ans_lists'][course]):
                         delay = last_submit({
@@ -763,11 +785,9 @@ def delay(student_id, context):
                         'delay': delay
                     }
             course_total_delays = {'SQL': 0, 'Python': 0}
-            
             for course in started_courses:
                 start = started_courses[course]['Start Time']
                 days_passed = min(compare_w_current(start), 10)
-                
                 for i in range(days_passed):
                     day_key = f"{course}_Day_{i+1}"
                     current = datetime.utcnow() + timedelta(hours=5, minutes=30)
@@ -776,12 +796,9 @@ def delay(student_id, context):
                     existing = datetime.strptime(str(time).split(' ')[0], "%Y-%m-%d")
                     d_days = (current - existing).days
                     day_delay = d_days - i
-
-                    # Check if the day is completed
                     if (day_key in days['Qns_lists'] and 
                         day_key in days['Ans_lists'] and 
                         len(days['Qns_lists'][day_key]) == len(days['Ans_lists'][day_key])):
-                        
                         completion_time = datetime.strptime(days['End_Course'][day_key], "%Y-%m-%d") if isinstance(days['End_Course'][day_key], str) else days['End_Course'][day_key]
                         expected_completion = start + timedelta(days=(i + 1))
                         
@@ -797,28 +814,21 @@ def delay(student_id, context):
                         "delay": day_delay,
                         "total_days": 1
                     }
-
-            # Add summary entries for SQL and Python
+            course_total_delays['Python'] = calculate_python_delay(started_courses, days)
             for course in ['SQL', 'Python']:
                 if course in course_total_delays:
                     result[course] = {
                         "total_days": 10,
                         "delay": course_total_delays[course]
                     }
-
-        # Format final output
         output = {
             "HTMLCSS": result.get("HTMLCSS", {"total_days": 10, "delay": "0"}),
             "Java_Script": result.get("Java_Script", {"total_days": 21, "delay": "0"})
         }
-        
-        # Add all other entries (SQL_Day_1, SQL_Day_2, etc.)
         for key in result:
             if key not in ["HTMLCSS", "Java_Script"]:
                 output[key] = result[key]
-
         return output
-
     except Exception as e:
         print(f"Error in delay calculation: {str(e)}{student_id}")
         return {
@@ -827,8 +837,6 @@ def delay(student_id, context):
             "SQL": {"total_days": 10, "delay": 0},
             "Python": {"total_days": 10, "delay": 0}
         }
-
-
 def calculate_course_delays(data):
     student_id = data['StudentId']
     ended_courses = data['Ended_Courses']
