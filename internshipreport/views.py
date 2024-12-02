@@ -420,7 +420,7 @@ def per_student_JS_ques_detials(request):
 
 def get_questions(questionid,course):
     CONTAINER ="internship"
-    qnsdata = download_blob2('Internship_days_schema/'+course+ '/'+questionid+'.json',CONTAINER)
+    qnsdata = download_blob2('Internship_days_schema/'+course+ '/'+questionid+'.json')
     qnsdata = json.loads(qnsdata)
     return qnsdata["Qn"]
 
