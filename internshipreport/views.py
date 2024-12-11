@@ -101,7 +101,8 @@ def overallscore(student):
             "HTMLCSS", "Java_Script", "SQL_Day_1", "SQL_Day_2", "SQL_Day_3",
             "SQL_Day_4", "SQL_Day_5", "SQL_Day_6", "SQL_Day_7", "SQL_Day_8",
             "SQL_Day_9", "SQL_Day_10", "Python_Day_1", "Python_Day_2",
-            "Python_Day_3", "Python_Day_4", "Python_Day_5"
+            "Python_Day_3", "Python_Day_4", "Python_Day_5", "Python_Day_6",
+            "Python_Day_7", "Python_Day_8", "Python_Day_9", "Python_Day_10"
         }
         qns_lists = student['Qns_lists']
         for topic in question_list:
