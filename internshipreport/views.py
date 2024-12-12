@@ -11,6 +11,8 @@ from rest_framework.decorators import api_view
 from django.db.models import QuerySet 
 from datetime import datetime, timedelta
 from googleMeet.models import Participant
+from django.db.models import Sum
+
 @csrf_exempt
 def create_student_details(request):
     if request.method == 'POST':
@@ -101,7 +103,7 @@ def overallscore(student):
             "HTMLCSS", "Java_Script", "SQL_Day_1", "SQL_Day_2", "SQL_Day_3",
             "SQL_Day_4", "SQL_Day_5", "SQL_Day_6", "SQL_Day_7", "SQL_Day_8",
             "SQL_Day_9", "SQL_Day_10", "Python_Day_1", "Python_Day_2",
-            "Python_Day_3", "Python_Day_4", "Python_Day_5", "Python_Day_6",
+            "Python_Day_3", "Python_Day_4", "Python_Day_5", "Python_Day_6", 
             "Python_Day_7", "Python_Day_8", "Python_Day_9", "Python_Day_10"
         }
         qns_lists = student['Qns_lists']
@@ -149,6 +151,8 @@ def getRankings(rankings_data):
     except Exception as e:
         print(f"Error in getRankings: {str(e)}")
         return {}
+    
+
 
 
 def combine_data(result, userprogress):
@@ -449,7 +453,7 @@ def get_total_durations_for_all_students(attendance_records, subject=None):
         "Java_Script": ("2024-10-14", "2024-11-02"),
         "SQL": ("2024-11-04", "2024-11-13"),
         "Python": ("2024-11-15", "2024-11-24"),
-        "Internship": ("2024-11-26", "2024-12-31")
+        "Internship": ("2025-01-01", "2025-01-31")
     }
 
     # Convert date ranges to aware datetime objects
@@ -534,14 +538,14 @@ def frontpagedeatialsmethod(request):
             'email',
             'mob_No'
         ).order_by('StudentId'))
-        
+
         # Filter out admin/trainer/test accounts
         student_details = [
-            student for student in student_details 
-            if not any(excluded in student['StudentId'] 
+            student for student in student_details
+            if not any(excluded in student['StudentId']
                        for excluded in ['ADMI', 'TRAI', 'TEST'])
         ]
-        
+
         if not student_details:
             return JsonResponse({'message': 'No data found'}, status=404)
 
@@ -551,8 +555,8 @@ def frontpagedeatialsmethod(request):
         all_questions = list(QuestionDetails_Days.objects.filter(
             Student_id__in=student_ids
         ).values(
-            'Student_id', 
-            'Subject', 
+            'Student_id',
+            'Subject',
             'DateAndTime',
             'Score',
             'Attempts',
@@ -571,7 +575,7 @@ def frontpagedeatialsmethod(request):
         all_rankings = list(Rankings.objects.filter(
             StudentId__in=student_ids
         ).values('StudentId', 'Course', 'Rank'))
-        
+
         # Organize data into lookup dictionaries
         questions_data = {}
         days_questions = {}
@@ -606,12 +610,23 @@ def frontpagedeatialsmethod(request):
         # Calculate user durations
         user_durations = get_total_durations_for_all_students(all_attendance)
         rankings = getRankings(all_rankings)
+    
+        #Calculate overall rankings
+        aggregate_scores = Rankings.objects.filter(Course__in=subjects).values('StudentId').annotate(total_score=Sum('Score')).order_by('-total_score')
+        overall_ranks = {}
 
+        rank = 1
+        for student_score in aggregate_scores:
+            overall_ranks[student_score['StudentId']] = rank
+            rank += 1
+
+
+        
         # Process each student's data
         result = []
         for student in student_details:
             student_id = student['StudentId']
-            
+
             # Create student base info
             student_info = {
                 'id': student_id,
@@ -637,18 +652,34 @@ def frontpagedeatialsmethod(request):
             }
             subject_counts = get_subject_counts(questions_data.get(student_id, []))
 
+            total_questions_answered = 0
+            total_question_limit = 0
+
+            for subject, count in subject_counts.get(student_id, {}).items():
+                answered, limit = map(int, count.split('/'))
+                total_questions_answered += answered
+                total_question_limit += limit
+
             # Calculate scores and other metrics
             student_info.update({
                 'totalScore': scorescumulation(days_questions_data),
-                'overallScore': overallscore(days_questions_data)['totalscore'],
+                'overallScore': overallscore(days_questions_data).get('totalscore', 0),
                 'totalNumberOFQuesAns': {
                     'totalNumberOFQuesAns': subject_counts.get(student_id, {}),
+                    'Number_Of_Questions_Answered_overall': f"{total_questions_answered}/{total_question_limit}",
                 },
                 'no_of_hrs': user_durations.get(student_id, {}),
                 'Delay': delay(student_id, delay_context),
-                'rank': {
-                    course: ranking_data.get(student_id, {'rank': '0'})
-                    for course, ranking_data in rankings.items()
+                "rank": {
+                    **{
+                        course: {
+                            "rank": ranking_data.get(student_id, {"rank": "0"}).get("rank", "0")
+                        }
+                        for course, ranking_data in rankings.items()
+                    },
+                    "Overall": {
+                        "rank": overall_ranks.get(student_id, "0")
+                    }
                 },
                 'attendanceSummary': get_online_attendance(student_id, sessions,sessionscount)
             })
@@ -660,8 +691,6 @@ def frontpagedeatialsmethod(request):
     except Exception as e:
         print(f"Error in frontpagedeatialsmethod: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
-
-
 
 
 
@@ -679,7 +708,8 @@ def delay(student_id, context):
                 "HTMLCSS": {"total_days": 10, "delay": "0"},
                 "Java_Script": {"total_days": 21, "delay": "0"},
                 "SQL": {"total_days": 15, "delay": 0},
-                "Python": {"total_days": 15, "delay": 0}
+                "Python": {"total_days": 15, "delay": 0},
+                "All": {"overall_delay": 0}
             }
         course_durations = {
             "HTMLCSS": 10,
@@ -829,6 +859,17 @@ def delay(student_id, context):
         for key in result:
             if key not in ["HTMLCSS", "Java_Script"]:
                 output[key] = result[key]
+
+        html_css_delay = int(output.get("HTMLCSS", {}).get("delay", 0))
+        java_script_delay = int(output.get("Java_Script", {}).get("delay", 0))
+        sql_delay = int(output.get("SQL", {}).get("delay", 0))
+        python_delay = int(output.get("Python", {}).get("delay", 0))
+
+        overall_delay = sum([html_css_delay, java_script_delay, sql_delay, python_delay])
+
+        output["All"] = {
+            "overall_delay": overall_delay
+        }
         return output
     except Exception as e:
         print(f"Error in delay calculation: {str(e)}{student_id}")
@@ -836,7 +877,8 @@ def delay(student_id, context):
             "HTMLCSS": {"total_days": 10, "delay": "0"},
             "Java_Script": {"total_days": 21, "delay": "0"},
             "SQL": {"total_days": 10, "delay": 0},
-            "Python": {"total_days": 10, "delay": 0}
+            "Python": {"total_days": 10, "delay": 0},
+            "All": {"overall_delay": 0}
         }
 def calculate_course_delays(data):
     student_id = data['StudentId']
@@ -1105,6 +1147,3 @@ def calculate_delay(course_start, course_end, expected_duration):
             "delay": delay
         }
     return {"total_days": "NA", "delay": "NA"}
-
-
-
