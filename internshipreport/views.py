@@ -80,7 +80,7 @@ def create_student_details_days_questions(request):
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
 def get_subject_counts(question_details):
-    categories = {"HTML": 30, "Python": 150, "SQL": 150, "Java_Script": 30}
+    categories = {"HTML": 30, "Python": 150, "SQL": 150, "Java_Script": 30, "Internship": 14}  # Adding Internships
     subject_counts_by_student = {}
     for question in question_details:
         student_id = question['Student_id']
@@ -190,17 +190,23 @@ def scorescumulation(student):
             score_sum += score_value
         
         score_breakdown[key] = score_value
+    try:
+        internship_details = InternshipsDetails.objects.get(StudentId=student.get('Student_id'))
+        internship_score = internship_details.InternshipScores.get("HireMeWebApplication")
+        score_sum += float(internship_score)
+        score_breakdown.update({'InternshipScores': float(internship_score)})
+        score_breakdown['InternshipScores'] = internship_score
+    except InternshipsDetails.DoesNotExist:
+        internship_score = 0
+        score_breakdown['InternshipScores'] = internship_score
     total_HTMLCSS_half = score_HTMLCSS / 2
     score_sum += total_HTMLCSS_half
-
     score_breakdown['HTMLCSSScore'] = round(total_HTMLCSS_half, 2)
     
     return {
         'Total_Score': score_sum,
         'Score_Breakdown': score_breakdown
     }
-
-
 
 @api_view(['GET'])
 def getSTdDaysdetailes(req):
@@ -315,6 +321,100 @@ def per_student_JS_data(request):
         "Javascript":studentsJava_ScriptStatus,
     })
 
+# this method is to get answers of a particular project
+from django.http import JsonResponse
+import json
+from .models import InternshipsDetails
+from web_project.Blob_service import download_blob2 
+def fetch_question_data(page):
+    try:
+        return json.loads(download_blob2(f'Internship_days_schema/internshipJSONS/{str(page)}.json'))
+    except Exception as e:
+        # print(f"Error fetching question data for page {page}: {str(e)}")
+        return {}
+
+@csrf_exempt
+@require_POST
+def per_student_page_project_data(request):
+    try:
+        data = json.loads(request.body)
+        student_id = data.get('student_id')
+        
+        student = InternshipsDetails.objects.filter(StudentId=student_id).first()
+        if not student:
+            return JsonResponse({'Student not found'}, status=200)
+        
+        studenttsdata = studentdata(student_id)
+        pages_data = []
+        project_name = student.ProjectName[0]
+        Databaseeditors = ['Table1', 'Table2', 'Table3', 'Table4']
+        all_pages = []
+        pagestatus = []
+
+        for project_name, details in student.ProjectStatus.items():
+            for key, value in details.items():
+                all_pages.append(key)
+                pagestatus.append(value)
+        # print(all_pages)
+        for page in all_pages:
+            qdata = fetch_question_data(page)
+            
+            rows = []
+            if page != 'Database_setup':
+                editors = ['HTML', 'CSS', 'JS', 'Python', 'app.py']
+                for editor in editors:
+                    editor_code = getattr(student, f"{editor}Code", {}).get(str(project_name), {}).get(page)
+                    editor_score = getattr(student, f"{editor}Score", {}).get(str(project_name), {}).get(f"{page}_Score")
+
+                    if editor_code and editor_score:
+                        rows.append({
+                            "editors": editor,
+                            "question": qdata.get('Explanation', {}).get(editor, f"{editor} Code"),
+                            "answer": editor_code,
+                            "requirement": editor_score,
+                            "score": editor_score
+                        })
+
+            else:
+                for editor in Databaseeditors:
+                    database_code = student.DatabaseCode.get(str(project_name), {}).get(editor)
+                    database_score = student.DatabaseScore.get(str(project_name), {}).get(f"{editor}_Score")
+                    
+                    if database_code and database_score:
+                        rows.append({
+                            "editors": editor,
+                            "question": qdata.get('Explanation', {}).get(editor, f"{editor} Code"),
+                            "answer": database_code,
+                            "requirement": database_score,
+                            "score": database_score
+                        })
+            
+            pages_data.append({
+                "pageName": page,
+                "rows": rows
+            })
+
+        student_data = {
+            'name': studenttsdata['name'],
+            'college': studenttsdata['college'],
+            'branch': studenttsdata['branch'],
+            'phone': studenttsdata['phone'],
+            'email': studenttsdata['email'],
+        }
+
+        return JsonResponse({
+            'student_id': student.StudentId,
+            'Name': student_data['name'],
+            'college': student_data['college'],
+            'branch': student_data['branch'],
+            'phone': student_data['phone'],
+            'email': student_data['email'],
+            'pagesData': pages_data,
+            'studentQuesList': all_pages
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
 # this method is to get answers of a particular html css question
 @csrf_exempt
@@ -422,6 +522,7 @@ def per_student_JS_ques_detials(request):
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
 
+CONTAINER ="internship"
 
 def get_questions(questionid,course):
     CONTAINER ="internship"

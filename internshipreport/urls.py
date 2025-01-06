@@ -14,6 +14,7 @@ urlpatterns = [
     path('per-student-JavaScript-data/',per_student_JS_data,name='per-student-JS-data'),
     path('per_ques_stu/',per_student_ques_detials,name='per_ques_stu'),    
     path('per_ques_JavaScript_stu/',per_student_JS_ques_detials,name='per_ques_stu'),    
+    path('per-student-Project-data/',per_student_page_project_data,name='per-student-page-project-data'),
     path('students/', student_list, name='student-list'),
     path('student-details-day/<str:student_id>/<str:course>/', student_details_day, name='student-details-day'),
     path('report/<str:student_id>/<str:course>/<str:day>/', getreport, name='getreport'),

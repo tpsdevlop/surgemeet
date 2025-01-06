@@ -110,4 +110,34 @@ class Rankings(models.Model):
     class Meta:
         managed = False  
         db_table = 'Exskilence_rankings'
+class InternshipsDetails(models.Model):###
+    ID             = models.AutoField( primary_key=True)
+    StudentId      = models.CharField(max_length=25,unique=True)
+    ProjectName    = models.JSONField(default=list)
+    ProjectStatus  = models.JSONField(default=dict)
+    SubmissionDates = models.JSONField(default=dict)
+    ProjectDateAndTime = models.JSONField(default=dict)
+   
+    HTMLCode       = models.JSONField(default=dict)
+    HTMLScore      = models.JSONField(default=dict)
+ 
+    CSSCode        = models.JSONField(default=dict)
+    CSSScore       = models.JSONField(default=dict)
+ 
+    JSCode         = models.JSONField(default=dict)
+    JSScore        = models.JSONField(default=dict)
+ 
+    PythonCode     = models.JSONField(default=dict)
+    PythonScore    = models.JSONField(default=dict)
+ 
+    AppPyCode      = models.JSONField(default=dict)
+    AppPyScore     = models.JSONField(default=dict)
+ 
+    DatabaseCode   = models.JSONField(default=dict)
+    DatabaseScore  = models.JSONField(default=dict)
+ 
+    InternshipScores = models.JSONField(default=dict)
+    class Meta:
+        managed = False  
+        db_table = 'Exskilence_internshipsdetails'
  
