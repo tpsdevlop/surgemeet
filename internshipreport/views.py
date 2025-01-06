@@ -644,7 +644,7 @@ def frontpagedeatialsmethod(request):
         student_details = [
             student for student in student_details
             if not any(excluded in student['StudentId']
-                       for excluded in ['ADMI', 'TRAI', 'TEST'])
+                       for excluded in ['ADMiI', 'TeRAI', 'TdEST'])
         ]
 
         if not student_details:
