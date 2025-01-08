@@ -361,7 +361,7 @@ def per_student_page_project_data(request):
             
             rows = []
             if page != 'Database_setup':
-                editors = ['HTML', 'CSS', 'JS', 'Python', 'app.py']
+                editors = ['HTML', 'CSS', 'JS', 'Python', 'AppPy']
                 for editor in editors:
                     editor_code = getattr(student, f"{editor}Code", {}).get(str(project_name), {}).get(page)
                     editor_score = getattr(student, f"{editor}Score", {}).get(str(project_name), {}).get(f"{page}_Score")
